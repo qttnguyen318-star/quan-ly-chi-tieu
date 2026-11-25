@@ -39,12 +39,18 @@ nav button{background:none;border:0;color:var(--mut);font-size:12px;flex:1;min-h
 #toast{position:fixed;left:50%;top:calc(14px + env(safe-area-inset-top,0px));transform:translateX(-50%);background:#2b3142;border:1px solid var(--bd);padding:9px 14px;border-radius:99px;z-index:20;display:none;font-size:14px;max-width:90%}
 .tabs>section{display:none}.tabs>section.on{display:block}
 .sug{font-size:12px;color:var(--ac);margin-top:4px}
-.mini{padding:6px 0;font-size:13px;gap:8px}
+.mini{padding:6px 0;font-size:13px;gap:8px}.mini .k,.badge{white-space:nowrap}
+header{flex-wrap:nowrap}header h1{font-size:16px;white-space:nowrap}header #syn{font-size:10px!important}
+.hr{display:flex;gap:6px;align-items:center;flex:none}.hr button{padding:4px 8px;min-width:36px;min-height:36px}.hr .dp{width:auto;min-width:78px;min-height:36px;padding:4px 10px}
+.dp{position:relative;display:flex;align-items:center;width:100%;min-height:40px;background:var(--c2);border:1px solid var(--bd);border-radius:10px;padding:9px 11px;white-space:nowrap;overflow:hidden}
+.dp input{position:absolute;inset:0;width:100%!important;height:100%;opacity:0;cursor:pointer;min-height:0;padding:0;border:0}
+.item .t .k{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media(max-width:380px){header h1{font-size:14px}.hr .dp{min-width:70px}}
 </style>
 </head>
 <body>
 <div class="wrap">
-<header><h1>💰 Quản Lý Chi Tiêu <span id="syn" class="k" style="font-size:11px"></span></h1><div class="row n"><input type="month" id="per" style="width:auto"><button class="n" onclick="cfgForm()" aria-label="Đồng bộ">⚙️</button></div></header>
+<header><h1>💰 Quản Lý Chi Tiêu <span id="syn" class="k" style="font-size:11px"></span></h1><div class="hr"><input type="month" id="per"><button class="n" onclick="cfgForm()" aria-label="Đồng bộ">⚙️</button></div></header>
 <div class="tabs">
 <section id="t-ov" class="on"></section>
 <section id="t-tx"></section>
@@ -68,6 +74,8 @@ const BANKS=['VCB','MB','TCB','ACB','BIDV','CTG','VPB','TPB','VIB','STB','HDB','
 const KEY='qlct_v1';
 const uid=()=>Math.random().toString(36).slice(2,9);
 const today=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
+const fmtD=d=>d?d.split('-').reverse().join('/'):'';
+const fmtM=p=>p?'T'+p.slice(5,7)+'/'+p.slice(0,4):'';
 const fmt=n=>(Math.round(n)||0).toLocaleString('vi-VN')+'₫';
 const num=s=>parseInt(String(s).replace(/\D/g,''))||0;
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -83,7 +91,7 @@ function norm(d){['acc','tx','tr','debts'].forEach(k=>{d[k]=Array.isArray(d[k])?
 const CFG=(()=>{try{return JSON.parse(localStorage.getItem('qlct_cfg'))||{}}catch(e){return{}}})();
 let es=null,pushT=null;
 const fbUrl=()=>CFG.url.replace(/\/$/,'')+'/qlct/'+encodeURIComponent(CFG.room||'main')+'.json'+(CFG.secret?'?auth='+encodeURIComponent(CFG.secret):'');
-function setSync(s){const m={off:'',ok:'● đã đồng bộ',sync:'● đang đồng bộ…',err:'● lỗi đồng bộ'},e=$('#syn');if(e){e.textContent=m[s]||'';e.style.color=s=='ok'?'var(--ok)':s=='err'?'var(--bad)':'var(--warn)'}}
+function setSync(s){const m={off:'',ok:'● đồng bộ',sync:'● đang lưu…',err:'● lỗi'},e=$('#syn');if(e){e.textContent=m[s]||'';e.style.color=s=='ok'?'var(--ok)':s=='err'?'var(--bad)':'var(--warn)'}}
 function save(){S.ts=Date.now();try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){toast('Bộ nhớ đầy – hãy xuất JSON và xóa bớt ảnh')}push()}
 function push(){if(!CFG.url)return;clearTimeout(pushT);setSync('sync');pushT=setTimeout(async()=>{try{const r=await fetch(fbUrl(),{method:'PUT',body:JSON.stringify(S)});if(!r.ok)throw 0;setSync('ok')}catch(e){setSync('err')}},600)}
 function connect(){if(es){es.close();es=null}if(!CFG.url){setSync('off');return}setSync('sync');
@@ -128,7 +136,7 @@ const catOpts=(sel,type)=>(S.cats[type||'expense']||[]).map(c=>`<option ${c==sel
 
 /* ---------- Giao diện chính ---------- */
 function render(){
- $('#per').value=P;
+ $('#per').value=P;$('#per').dispatchEvent(new Event('input'));
  const tabs=[['ov','📊','Tổng quan'],['tx','🧾','Giao dịch'],['ac','🏦','Tài khoản'],['db','📌','Phải trả']];
  $('#nav').innerHTML=tabs.map(t=>`<button class="${tab==t[0]?'on':''}" onclick="go('${t[0]}')"><div style="font-size:19px">${t[1]}</div>${t[2]}</button>`).join('');
  document.querySelectorAll('.tabs>section').forEach(s=>s.classList.toggle('on',s.id=='t-'+tab));
@@ -163,15 +171,15 @@ function rOv(){
  <tr><td>Đã thanh toán trong kỳ</td><td>${fmt(S.debts.filter(d=>d.paid&&inP(d.pdate)).reduce((a,d)=>a+d.amount,0))}</td></tr>
  <tr><td><b>Còn phải trả cuối kỳ</b></td><td class="warn"><b>${fmt(o1)}</b></td></tr></table></div>
  <h2>Giao dịch gần đây</h2><div class="card" style="padding:4px 12px">${list.map(txMini).join('')||'<div class="mut" style="padding:8px 0">Chưa có giao dịch. Bấm ＋ để thêm.</div>'}${S.tx.length>5?'<button class="s" style="width:100%;margin:6px 0" onclick="go(\'tx\')">Xem tất cả →</button>':''}</div>
- <h2>Xuất báo cáo</h2><div class="row"><button class="p" onclick="exportX('report')">📗 Xuất Excel tháng ${P.split('-').reverse().join('/')}</button><button onclick="copySheets('report')">📋 Copy cho Google Sheets</button></div>
+ <h2>Xuất báo cáo</h2><div class="row"><button class="p" onclick="exportX('report')">📗 Xuất Excel ${fmtM(P)}</button><button onclick="copySheets('report')">📋 Copy cho Google Sheets</button></div>
  <div class="k" style="margin-top:6px">File .xlsx gồm 4 sheet: Tổng hợp, Giao dịch, Chuyển nội bộ, Phải trả. Với Google Sheets: tải file lên Google Drive rồi mở bằng Trang tính, hoặc bấm Copy rồi dán (Ctrl+V) vào Sheets. Dữ liệu đã tự đồng bộ qua Firebase nên không cần sao lưu thủ công.</div>
  <button class="s" style="margin-top:10px" onclick="$('#imp').click()">Nhập file JSON cũ (nếu có)</button>`}
 
-function txMini(t){const inc=t.type=='income',d=ed(t);return`<div class="item mini" onclick="txView('${t.id}')"><span>${t.img?'🖼️':ICON[t.cat]||(inc?'💵':'📦')}</span><div class="t"><b>${esc(t.name)}</b></div><span class="k">${d.slice(8)}/${d.slice(5,7)}</span><b class="${inc?'ok':'bad'}">${inc?'+':'−'}${fmt(t.amount)}</b>${t.status=='pending'?'<span class="badge">⏳</span>':''}</div>`}
+function txMini(t){const inc=t.type=='income',d=ed(t);return`<div class="item mini" onclick="txView('${t.id}')"><span>${t.img?'🖼️':ICON[t.cat]||(inc?'💵':'📦')}</span><div class="t"><b>${esc(t.name)}</b></div><span class="k">${fmtD(d)}</span><b class="${inc?'ok':'bad'}">${inc?'+':'−'}${fmt(t.amount)}</b>${t.status=='pending'?'<span class="badge">⏳</span>':''}</div>`}
 function txRow(t){
  const inc=t.type=='income';
  return`<div class="item" onclick="txView('${t.id}')"><div class="th">${t.img?`<img src="${t.img}" alt="">`:ICON[t.cat]||'📦'}</div>
- <div class="t"><b>${esc(t.name)}</b><span class="k">${esc(t.cat)} · ${esc(accName(t.acc))} · ${ed(t).split('-').reverse().join('/')}</span></div>
+ <div class="t"><b>${esc(t.name)}</b><span class="k">${fmtD(ed(t))} · ${esc(t.cat)} · ${esc(accName(t.acc))}</span></div>
  <div style="text-align:right"><div class="${inc?'ok':'bad'}"><b>${inc?'+':'−'}${fmt(t.amount)}</b></div>${t.status=='pending'?'<span class="badge">Chờ TT</span>':''}</div></div>`}
 
 let F={type:'all',from:'',to:''};
@@ -183,14 +191,14 @@ function rTx(){
  const B=(v,x)=>`<button class="s ${F.type==v?'p':''}" onclick="F.type='${v}';rTx()">${x}</button>`;
  $('#t-tx').innerHTML=`<h2>Giao dịch</h2><div class="card"><div class="row" style="margin-bottom:8px">${B('all','Tất cả')}${B('income','Thu')}${B('expense','Chi')}${B('pending','Chờ TT')}</div>
  <div class="row"><div><label style="margin-top:0">Từ ngày</label><input type="date" value="${f}" onchange="F.from=this.value;rTx()"></div><div><label style="margin-top:0">Đến ngày</label><input type="date" value="${e}" onchange="F.to=this.value;rTx()"></div></div>
- <button class="s" style="margin-top:8px" onclick="F.from=F.to='';rTx()">Về tháng đang chọn (${P.split('-').reverse().join('/')})</button></div>
+ <button class="s" style="margin-top:8px" onclick="F.from=F.to='';rTx()">Về tháng đang chọn (${fmtM(P)})</button></div>
  <div class="grid"><div class="card"><div class="k">Thu (đã TT)</div><div class="v ok">${fmt(sum(true))}</div></div><div class="card"><div class="k">Chi (đã TT)</div><div class="v bad">${fmt(sum(false))}</div></div></div>
  <div class="k" style="margin:2px 2px 6px">${l.length} giao dịch</div><div class="card">${l.map(txRow).join('')||'<div class="mut">Không có giao dịch phù hợp.</div>'}</div>
  <div class="row"><button onclick="exportX('tx')">📗 Xuất Excel</button><button onclick="copySheets('tx')">📋 Copy cho Google Sheets</button></div>`}
 function listBy(k){
  let l,ti;
  if(k=='pending'){l=S.tx.filter(t=>t.status=='pending');ti='⏳ Chờ thanh toán'}
- else{const inc=k=='income';l=S.tx.filter(t=>t.status=='paid'&&inP(ed(t))&&(t.type=='income')==inc);ti=(inc?'Tổng thu':'Tổng chi')+' · tháng '+P.split('-').reverse().join('/')}
+ else{const inc=k=='income';l=S.tx.filter(t=>t.status=='paid'&&inP(ed(t))&&(t.type=='income')==inc);ti=(inc?'Tổng thu':'Tổng chi')+' · '+fmtM(P)}
  l.sort((a,b)=>ed(b).localeCompare(ed(a)));const sum=l.reduce((a,t)=>a+t.amount,0);
  openM(`<h1>${ti}</h1><div class="v ${k=='income'?'ok':k=='expense'?'bad':'warn'}" style="margin:6px 0">${fmt(sum)}</div><div>${l.map(txRow).join('')||'<div class="mut">Chưa có giao dịch.</div>'}</div><button class="p" style="width:100%;margin-top:10px" onclick="F={type:'${k}',from:'',to:''};closeM();go('tx')">Mở trong tab Giao dịch →</button>`)}
 
@@ -207,7 +215,7 @@ function delRule(k){delete S.rules[k];save();render()}
 function rDb(){
  const l=[...S.debts].sort((a,b)=>b.date.localeCompare(a.date));
  $('#t-db').innerHTML=`<h2>Các khoản phải trả</h2><button class="p" style="width:100%;margin-bottom:10px" onclick="dbForm()">＋ Thêm khoản phải trả</button>
- <div class="card">${l.map(d=>`<div class="item" onclick="dbForm('${d.id}')"><div class="t"><b>${esc(d.name)}</b><span class="k">Ngày ${d.date.split('-').reverse().join('/')}${d.paid?` · đã trả ${d.pdate.split('-').reverse().join('/')} (${esc(accName(d.acc))})`:` · dự kiến trả từ ${esc(accName(d.acc))}`}</span></div>
+ <div class="card">${l.map(d=>`<div class="item" onclick="dbForm('${d.id}')"><div class="t"><b>${esc(d.name)}</b><span class="k">${fmtD(d.date)}${d.paid?` · đã trả ${d.pdate.split('-').reverse().join('/')} (${esc(accName(d.acc))})`:` · dự kiến trả từ ${esc(accName(d.acc))}`}</span></div>
  <div style="text-align:right"><b class="${d.paid?'ok':'warn'}">${fmt(d.amount)}</b><div>${d.paid?'<span class="k">✓ Đã TT</span>':`<button class="s g" onclick="event.stopPropagation();payDebt('${d.id}')">Đã thanh toán</button>`}</div></div></div>`).join('')||'<div class="mut">Chưa có khoản phải trả. Khoản có ngày trước kỳ đang xem sẽ tính là phải trả đầu kỳ.</div>'}</div>`}
 
 /* ---------- Form giao dịch + AI ---------- */
@@ -371,7 +379,7 @@ function exportX(kind){
  if(kind=='tx'){dlBlob(`giao-dich-${today()}.xlsx`,xlsx([['Giao dịch',[TXH,...txRows(txFiltered())]]]));return}
  const s=sums(),inc=S.debts.filter(d=>inP(d.date)).reduce((a,d)=>a+d.amount,0),ptx=S.tx.filter(t=>inP(ed(t)));
  dlBlob(`bao-cao-${P}.xlsx`,xlsx([
-  ['Tổng hợp',[['BÁO CÁO THÁNG',P],[],['Tổng thu',s.inc],['Tổng chi',s.exp],['Chuyển nội bộ (không tính thu/chi)',s.tr],['Chờ thanh toán',s.pend],[],['Tài khoản','Đầu kỳ','Cuối kỳ'],...S.acc.map(a=>[a.name,bal(a.id,S0()),bal(a.id,E0())]),[],['Phải trả đầu kỳ',owe(S0())],['Phát sinh trong kỳ',inc],['Còn phải trả cuối kỳ',owe(E0())]]],
+  ['Tổng hợp',[['BÁO CÁO THÁNG',fmtM(P)],[],['Tổng thu',s.inc],['Tổng chi',s.exp],['Chuyển nội bộ (không tính thu/chi)',s.tr],['Chờ thanh toán',s.pend],[],['Tài khoản','Đầu kỳ','Cuối kỳ'],...S.acc.map(a=>[a.name,bal(a.id,S0()),bal(a.id,E0())]),[],['Phải trả đầu kỳ',owe(S0())],['Phát sinh trong kỳ',inc],['Còn phải trả cuối kỳ',owe(E0())]]],
   ['Giao dịch',[TXH,...txRows(ptx)]],
   ['Chuyển nội bộ',[['Ngày','Từ','Đến','Số tiền (₫)','Ghi chú'],...S.tr.filter(t=>inP(t.date)).map(t=>[t.date,accName(t.from),accName(t.to),t.amount,t.note||''])]],
   ['Phải trả',[['Nội dung','Ngày phát sinh','Số tiền (₫)','Tài khoản','Trạng thái','Ngày thanh toán'],...S.debts.map(d=>[d.name,d.date,d.amount,accName(d.acc),d.paid?'Đã thanh toán':'Chưa thanh toán',d.pdate||''])]]]))}
@@ -381,6 +389,11 @@ function copySheets(kind){
 $('#imp').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(!d.acc||!d.tx)throw 0;if(!confirm('Thay toàn bộ dữ liệu hiện tại bằng file này?'))return;S=norm({...d});save();render();toast('Đã nhập dữ liệu')}catch(_){toast('File JSON không hợp lệ')}};r.readAsText(f);e.target.value=''};
 
 render();connect();
+function dp(i){if(i.dataset.dp)return;i.dataset.dp=1;const w=document.createElement('span'),t=document.createElement('span'),mo=i.type=='month';w.className='dp';
+ const upd=()=>{const v=i.value;t.textContent=v?(mo?fmtM(v):fmtD(v)):(mo?'Tmm/yyyy':'dd/mm/yyyy');t.style.color=v?'':'var(--mut)'};
+ i.parentNode.insertBefore(w,i);w.append(t,i);upd();['input','change'].forEach(e=>i.addEventListener(e,upd));i.addEventListener('click',()=>{try{i.showPicker()}catch(_){}})}
+const scanDp=()=>document.querySelectorAll('input[type=date],input[type=month]').forEach(dp);
+new MutationObserver(scanDp).observe(document.body,{childList:true,subtree:true});scanDp();
 </script>
 </body>
 </html>
